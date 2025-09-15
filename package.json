@@ -1,0 +1,26 @@
+{
+  "name": "amazon-q-modernizer",
+  "version": "0.2.0",
+  "description": "Minimal CLI helper to run Amazon Q modernization workflow prompts.",
+  "main": "src/index.js",
+  "bin": {
+    "aq-modernize": "bin/aq-modernize.js"
+  },
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "keywords": [
+    "amazon-q",
+    "modernization",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "commander": "^14.0.1",
+    "execa": "^5.1.1"
+  }
+}
