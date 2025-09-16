@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Amazon Q Modernizer UI</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>" />
+  </head>
+  <body style="opacity: 0; transition: opacity 0.5s ease;">
+    <main class="container">
+      <header>
+        <h1>🤖 Amazon Q Modernizer</h1>
+        <p class="subtitle">Transform your legacy code with AI-powered modernization</p>
+      </header>
+
+      <section class="panel collapsible" id="repo-panel">
+        <div class="panel-header">
+          <h2>🔧 Repository Settings</h2>
+        </div>
+        <div class="panel-content">
+        <form id="run-form">
+          <label>
+            📦 Repository URL
+            <input 
+              id="repository" 
+              name="repository" 
+              type="url" 
+              placeholder="https://github.com/user/project.git" 
+              required 
+              autocomplete="url"
+            />
+          </label>
+          
+          <label>
+            📁 Workspace Directory
+            <input 
+              id="directory" 
+              name="directory" 
+              type="text" 
+              value="./workspaces" 
+              autocomplete="off"
+            />
+          </label>
+          
+          <label>
+            🏷️ Folder Name
+            <input 
+              id="folder" 
+              name="folder" 
+              type="text" 
+              placeholder="auto-generated from repository name" 
+              autocomplete="off"
+            />
+          </label>
+
+          <div class="options">
+            <label class="checkbox">
+              <input id="force" type="checkbox" />
+              🗑️ Overwrite existing folder
+            </label>
+            <label class="checkbox">
+              <input id="dry-run" type="checkbox" />
+              👁️ Dry run (preview actions only)
+            </label>
+          </div>
+
+          <div class="actions">
+            <button type="button" id="preview-prompt" title="Ctrl/Cmd + P">
+              👀 Preview Prompt
+            </button>
+            <button type="submit" id="run-button" title="Ctrl/Cmd + Enter">
+              🚀 Run Modernization
+            </button>
+          </div>
+        </form>
+        </div>
+      </section>
+
+      <section class="panel collapsible" id="prompt-panel">
+        <div class="panel-header">
+          <h2>📝 Prompt Preview</h2>
+          <span id="prompt-status" class="status">Ready to preview</span>
+        </div>
+        <div class="panel-content">
+          <pre id="prompt-output" class="output" aria-live="polite" aria-label="Prompt preview output"></pre>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>📊 Execution Log</h2>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span id="run-status" class="status">Waiting for execution</span>
+            <button type="button" id="maximize-log" title="Open log in a modal">⛶ Maximize</button>
+          </div>
+        </div>
+        <pre id="log-output" class="output" aria-live="polite" aria-label="Execution log output"></pre>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>📦 Artifacts</h2>
+          <span class="status" id="artifacts-status">Monitoring files</span>
+        </div>
+        <div class="artifacts">
+          <div class="artifact">
+            <div class="artifact-info">
+              <strong>Plan</strong>
+              <span id="status-plan" class="badge">waiting…</span>
+            </div>
+            <button type="button" id="view-plan">View</button>
+          </div>
+          <div class="artifact">
+            <div class="artifact-info">
+              <strong>Changelog</strong>
+              <span id="status-changelog" class="badge">waiting…</span>
+            </div>
+            <button type="button" id="view-changelog">View</button>
+          </div>
+          <div class="artifact">
+            <div class="artifact-info">
+              <strong>Review</strong>
+              <span id="status-review" class="badge">waiting…</span>
+            </div>
+            <button type="button" id="view-review">View</button>
+          </div>
+        </div>
+        <div class="artifact-render">
+          <div class="tabbar">
+            <button type="button" id="tab-plan" class="tab active">Plan</button>
+            <button type="button" id="tab-changelog" class="tab">Changelog</button>
+            <button type="button" id="tab-review" class="tab">Review</button>
+          </div>
+          <pre id="artifact-output" class="output" aria-live="polite" aria-label="Artifact preview output"></pre>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>💡 <strong>Tips:</strong> Use <kbd>Ctrl/Cmd + P</kbd> to preview prompt, <kbd>Ctrl/Cmd + Enter</kbd> to run</p>
+      <p>🔗 Powered by <a href="https://aws.amazon.com/q/" target="_blank" rel="noopener">Amazon Q</a></p>
+    </footer>
+
+    <!-- Log Modal -->
+    <div id="log-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="log-modal-title">
+      <div class="modal-content" role="document">
+        <div class="modal-header">
+          <h3 id="log-modal-title" style="margin:0;">Execution Log</h3>
+          <button class="modal-close" id="close-log-modal" aria-label="Close log modal">✕</button>
+        </div>
+        <pre id="modal-log-output" class="output" aria-live="polite" aria-label="Modal execution log output"></pre>
+      </div>
+    </div>
+
+    <!-- Document Modal -->
+    <div id="doc-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="doc-modal-title">
+      <div class="modal-content" role="document">
+        <div class="modal-header">
+          <h3 id="doc-modal-title" style="margin:0;">Document</h3>
+          <button class="modal-close" id="close-doc-modal" aria-label="Close document modal">✕</button>
+        </div>
+        <pre id="doc-output" class="output" aria-live="polite" aria-label="Document output"></pre>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -7,7 +7,8 @@
     "aq-modernize": "bin/aq-modernize.js"
   },
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "web": "node src/server.js"
   },
   "keywords": [
     "amazon-q",
@@ -21,6 +22,7 @@
   },
   "dependencies": {
     "commander": "^14.0.1",
-    "execa": "^5.1.1"
+    "execa": "^5.1.1",
+    "express": "^4.19.2"
   }
 }

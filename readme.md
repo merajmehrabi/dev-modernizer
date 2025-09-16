@@ -10,6 +10,20 @@ Install dependencies:
 npm install
 ```
 
+### Launch the Web UI
+
+Start the local web interface to configure and run modernization jobs without the CLI:
+
+```bash
+npm run web
+```
+
+Then open http://localhost:3000 to:
+
+* Preview the generated Amazon Q prompt for a repository folder.
+* Trigger dry runs or full modernization runs with logging in the browser.
+* Customize workspace directory, folder name, and overwrite behavior.
+
 ### Run Against a Repository
 
 Clone the repository into `./workspaces/<folder>` and run Amazon Q from the workspace root:
