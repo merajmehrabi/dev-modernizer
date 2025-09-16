@@ -106,31 +106,28 @@
         <div class="artifacts">
           <div class="artifact">
             <div class="artifact-info">
+              <strong>Review</strong>
+              <span id="status-review" class="badge">waiting…</span>
+            </div>
+          </div>
+          <div class="artifact">
+            <div class="artifact-info">
               <strong>Plan</strong>
               <span id="status-plan" class="badge">waiting…</span>
             </div>
-            <button type="button" id="view-plan">View</button>
           </div>
           <div class="artifact">
             <div class="artifact-info">
               <strong>Changelog</strong>
               <span id="status-changelog" class="badge">waiting…</span>
             </div>
-            <button type="button" id="view-changelog">View</button>
-          </div>
-          <div class="artifact">
-            <div class="artifact-info">
-              <strong>Review</strong>
-              <span id="status-review" class="badge">waiting…</span>
-            </div>
-            <button type="button" id="view-review">View</button>
           </div>
         </div>
         <div class="artifact-render">
           <div class="tabbar">
-            <button type="button" id="tab-plan" class="tab active">Plan</button>
+            <button type="button" id="tab-review" class="tab active">Review</button>
+            <button type="button" id="tab-plan" class="tab">Plan</button>
             <button type="button" id="tab-changelog" class="tab">Changelog</button>
-            <button type="button" id="tab-review" class="tab">Review</button>
           </div>
           <pre id="artifact-output" class="output" aria-live="polite" aria-label="Artifact preview output"></pre>
         </div>

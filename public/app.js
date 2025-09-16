@@ -21,9 +21,7 @@
   const statusPlan = document.getElementById('status-plan');
   const statusChangelog = document.getElementById('status-changelog');
   const statusReview = document.getElementById('status-review');
-  const viewPlanBtn = document.getElementById('view-plan');
-  const viewChangelogBtn = document.getElementById('view-changelog');
-  const viewReviewBtn = document.getElementById('view-review');
+  // Row-level View buttons were removed to avoid duplication with tabs
   const docModal = document.getElementById('doc-modal');
   const docOutput = document.getElementById('doc-output');
   const closeDocModalBtn = document.getElementById('close-doc-modal');
@@ -36,12 +34,13 @@
   let currentLogStream = null;
   let currentFilesStream = null;
   let currentDocName = null;
+  let runActive = false;
   const artifactStates = {
     'plan.md': { seen: false, mtime: 0 },
     'changelog.md': { seen: false, mtime: 0 },
     'review.md': { seen: false, mtime: 0 },
   };
-  let selectedArtifact = 'plan.md';
+  let selectedArtifact = 'review.md';
 
   function deriveFolderName(repository) {
     if (!repository) {
@@ -86,6 +85,35 @@
   function setPanelsCollapsed(collapsed) {
     if (repoPanel) repoPanel.classList.toggle('collapsed', collapsed);
     if (promptPanel) promptPanel.classList.toggle('collapsed', collapsed);
+  }
+
+  function updateArtifactBadges() {
+    // Review first
+    if (artifactStates['review.md'].seen) {
+      setBadge(statusReview, 'available', 'success');
+    } else if (runActive) {
+      setBadge(statusReview, 'analyzing…', 'warn');
+    } else {
+      setBadge(statusReview, 'waiting…', 'neutral');
+    }
+
+    // Plan after review is ready
+    if (artifactStates['plan.md'].seen) {
+      setBadge(statusPlan, 'available', 'success');
+    } else if (runActive && artifactStates['review.md'].seen) {
+      setBadge(statusPlan, 'drafting…', 'warn');
+    } else {
+      setBadge(statusPlan, 'waiting…', 'neutral');
+    }
+
+    // Changelog after plan is ready
+    if (artifactStates['changelog.md'].seen) {
+      setBadge(statusChangelog, 'available', 'success');
+    } else if (runActive && artifactStates['plan.md'].seen) {
+      setBadge(statusChangelog, 'updating…', 'warn');
+    } else {
+      setBadge(statusChangelog, 'waiting…', 'neutral');
+    }
   }
 
   async function loadArtifactToInline(name) {
@@ -219,6 +247,8 @@
     
     setStatus(runStatus, 'Initializing...', 'info');
     setPanelsCollapsed(true);
+    runActive = true;
+    updateArtifactBadges();
     logOutput.textContent = '';
     if (modalLogOutput) modalLogOutput.textContent = '';
     runButton.disabled = true;
@@ -277,6 +307,8 @@
             runButton.disabled = false;
             previewButton.disabled = false;
             setPanelsCollapsed(false);
+            runActive = false;
+            updateArtifactBadges();
           }
         });
 
@@ -348,6 +380,8 @@
       const statusMessage = payload.dryRun ? 'Dry run completed' : 'Modernization completed';
       setStatus(runStatus, statusMessage, 'success');
       setPanelsCollapsed(false);
+      runActive = false;
+      updateArtifactBadges();
       
       if (data.result?.prompt && promptOutput.textContent.trim() === '') {
         animateOutput(promptOutput, data.result.prompt);
@@ -359,8 +393,8 @@
       console.error('Run error:', error);
       
       if (error.name === 'AbortError') {
-        logOutput.textContent = 'Request timed out after 5 minutes';
-        if (modalLogOutput) modalLogOutput.textContent = 'Request timed out after 5 minutes';
+        logOutput.textContent = 'Request timed out after 1 hour';
+        if (modalLogOutput) modalLogOutput.textContent = 'Request timed out after 1 hour';
         setStatus(runStatus, 'Request timeout', 'error');
       } else {
         logOutput.textContent = `Error: ${error.message}`;
@@ -371,6 +405,8 @@
       runButton.disabled = false;
       previewButton.disabled = false;
       setPanelsCollapsed(false);
+      runActive = false;
+      updateArtifactBadges();
     }
   });
 
@@ -386,11 +422,12 @@
       currentFilesStream.close();
     }
 
-    const params = new URLSearchParams({ directory, folder, names: 'plan.md,review.md,changelog.md' });
+    const params = new URLSearchParams({ directory, folder, names: 'review.md,plan.md,changelog.md' });
     const es = new EventSource(`/api/files-stream?${params.toString()}`);
     currentFilesStream = es;
 
     if (artifactsStatus) setStatus(artifactsStatus, 'Monitoring files', 'info');
+    updateArtifactBadges();
 
     es.addEventListener('artifact', async (e) => {
       try {
@@ -415,15 +452,27 @@
               docOutput.scrollTop = docOutput.scrollHeight;
             } catch (_) {}
           }
+          // Update inline preview if selected
+          if (selectedArtifact === name) {
+            try {
+              const file = await fetchFile(name);
+              if (artifactOutput) {
+                artifactOutput.textContent = file.content || '';
+                artifactOutput.scrollTop = artifactOutput.scrollHeight;
+              }
+            } catch (_) {}
+          }
           // Notify creation/update in the log
           if (firstSeen) {
             appendToLog(`📄 ${name} created\n`);
           } else if (newMtime && newMtime !== prevMtime) {
             appendToLog(`📄 ${name} updated\n`);
           }
+          updateArtifactBadges();
         } else if (status === 'missing') {
           setBadge(badge, 'missing', 'warn');
           artifactStates[name] = { seen: false, mtime: 0 };
+          updateArtifactBadges();
         } else if (status === 'error') {
           setBadge(badge, 'error', 'error');
         }
@@ -462,6 +511,11 @@
                     repositoryInput.value.includes('.git'));
     validateInput(repositoryInput, isValid);
   });
+
+  // Tabs for inline artifact preview
+  if (tabPlan) tabPlan.addEventListener('click', () => setActiveTab('plan.md'));
+  if (tabChangelog) tabChangelog.addEventListener('click', () => setActiveTab('changelog.md'));
+  if (tabReview) tabReview.addEventListener('click', () => setActiveTab('review.md'));
 
   // Add keyboard shortcuts
   document.addEventListener('keydown', (e) => {
@@ -545,6 +599,13 @@
     
     // Show the UI
     document.body.style.opacity = '1';
+    // Initialize default artifact tab if present
+    setTimeout(() => {
+      if (artifactOutput) {
+        setActiveTab(selectedArtifact);
+      }
+    }, 0);
+    updateArtifactBadges();
   }
 
   // Initialize when DOM is ready
@@ -590,9 +651,6 @@
     docModal.setAttribute('aria-hidden', 'true');
   }
 
-  if (viewPlanBtn) viewPlanBtn.addEventListener('click', () => openDoc('plan.md', 'plan.md'));
-  if (viewChangelogBtn) viewChangelogBtn.addEventListener('click', () => openDoc('changelog.md', 'changelog.md'));
-  if (viewReviewBtn) viewReviewBtn.addEventListener('click', () => openDoc('review.md', 'review.md'));
   if (closeDocModalBtn) closeDocModalBtn.addEventListener('click', closeDoc);
   if (docModal) {
     docModal.addEventListener('click', (e) => { if (e.target === docModal) closeDoc(); });
