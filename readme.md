@@ -1,92 +1,121 @@
 # Project: Automated Repository Analysis and Modernization with Amazon Q CLI
 
-This repository ships a helper CLI that clones a target project into a workspace directory and drives the Amazon Q CLI with a curated modernization prompt.
+This project provides both a CLI and a local Web UI to run Amazon Q modernization workflows against a repository. It clones your target repo into a workspace, generates a focused prompt, and runs the Amazon Q CLI while streaming logs to the browser and terminal.
+
+## Prerequisites
+
+- Node.js 18+
+- Git installed and on PATH
+- Amazon Q CLI installed and on PATH (`q --version` should work)
 
 ## Quick Start
 
-Install dependencies:
+- Install dependencies:
+
+  ```bash
+  npm install
+  ```
+
+- Launch the Web UI:
+
+  ```bash
+  npm run web
+  ```
+
+  Open http://localhost:3000 to:
+  - Configure repository URL, workspace directory, and folder name
+  - Preview the generated Amazon Q prompt
+  - Run dry runs or full modernization runs
+  - Watch real-time execution logs and artifacts as they are produced
+
+## Web UI Features
+
+- Live logs with streaming: execution logs stream to the browser in real time. You can maximize the log in a modal.
+- Collapsible panels: while a run is active, Repository Settings and Prompt Preview minimize with animation.
+- Artifacts panel with live status and inline preview:
+  - Order of creation: Review → Plan → Changelog
+  - Status badges show: “analyzing…”, “drafting…”, “updating…”, or “available”
+  - Tabbed inline preview renders the selected artifact and updates live as files change
+
+Notes:
+- Dry runs do not stream logs; they return a single aggregated log on completion.
+- ANSI sequences from the Q CLI are sanitized in the browser for clean display.
+
+## CLI Usage
+
+Run against a repository (clones into `./workspaces/<folder>` by default):
 
 ```bash
-npm install
+npx aq-modernize --repository https://github.com/your/repo.git
 ```
 
-### Launch the Web UI
+Options:
 
-Start the local web interface to configure and run modernization jobs without the CLI:
+- `--directory <path>` – Workspace root (default `./workspaces`)
+- `--folder <name>` – Folder name for the clone (defaults to repo name)
+- `--force` – Overwrite existing folder if it exists
+- `--dry-run` – Show planned actions without cloning or calling Q
 
-```bash
-npm run web
-```
+Behavior:
+- The CLI streams Amazon Q output to stdout in real time.
 
-Then open http://localhost:3000 to:
-
-* Preview the generated Amazon Q prompt for a repository folder.
-* Trigger dry runs or full modernization runs with logging in the browser.
-* Customize workspace directory, folder name, and overwrite behavior.
-
-### Run Against a Repository
-
-Clone the repository into `./workspaces/<folder>` and run Amazon Q from the workspace root:
-
-```bash
-npx aq-modernize --repository https://github.com/merajmehrabi/agentic-ai-hackaton-legacy-monolith-service.git
-```
-
-Useful options:
-
-* `--directory <path>` – Workspace root (default `./workspaces`). Amazon Q runs from this directory.
-* `--folder <name>` – Custom folder name for the clone (defaults to the repo name).
-* `--force` – Remove any existing clone before cloning again.
-* `--dry-run` – Show what would happen without cloning or calling Amazon Q.
-
-### Inspect the Prompt
+## Prompt Inspection
 
 ```bash
 npx aq-modernize prompt --repo-dir my-project
 ```
 
-or use the alias:
+Or use the alias:
 
 ```bash
 npx aq-modernize print --repo-dir my-project
 ```
 
-## Prompt Contents
+## Prompt Contents (summary)
 
-The CLI injects the relative repository directory into this prompt and passes it to Amazon Q:
+The generated prompt asks Q to:
 
-```
-You are assisting with repository analysis and modernization.
+1. Analyze the repo at `./<folder>` relative to the workspace
+2. Report issues and risks, then produce:
+   - `review.md` (overall report)
+   - `plan.md` (modernization steps)
+   - `changelog.md` (incremental changes)
+3. Execute the plan iteratively, verifying along the way
 
-Task:
-1. Analyze the repository located at "./<folder>" relative to the current working directory (typically ./workspaces). Change into that directory before running tools.
-2. Perform the following checks:
-   - Identify deprecated, vulnerable, or outdated dependencies.
-   - Detect potential code quality issues and smells.
-   - Highlight weak points in application architecture or design.
-   - Note testing coverage gaps or missing best practices.
-3. Produce a report in **Markdown** format named `review.md` containing:
-   - A summary of the overall health of the project.
-   - Detailed issues with examples (dependencies, code, architecture).
-   - Risks or potential problems during maintenance or scaling.
-4. Produce an actionable modernization roadmap in **Markdown** format named `plan.md`:
-   - Step-by-step instructions to fix identified issues.
-   - Dependency upgrade and replacement strategy.
-   - Suggested tooling or framework modernization.
-   - Architectural improvements with reasoning.
-5. Execute the roadmap iteratively:
-   - Apply changes step by step.
-   - After each step, verify that the project builds and runs.
-   - Stop any lingering processes when checks are complete.
-   - Commit each change to a dedicated branch named `modernization`.
-   - Update `changelog.md` with a description of what was changed and why.
-6. Continue until the entire plan is implemented.
+You can customize wording in `src/prompt.js`.
 
-Output Requirements:
-- Use clear, structured **Markdown** for `review.md` and `plan.md`.
-- Write concise and descriptive **git commit messages**.
-- Update `changelog.md` incrementally with every applied change.
-- Confirm at the end that the repository runs successfully and is modernized.
-```
+## Timeouts
 
-Adjust `src/prompt.js` if you need to customize the wording before running the CLI.
+- The Amazon Q subprocess timeout is set to 1 hour by default.
+  - Code: `src/services/modernizer.js` (execa `timeout: 3600000`)
+- The UI’s non-streaming request timeout is also 1 hour.
+  - Code: `public/app.js` (AbortController)
+
+## API Endpoints (UI backend)
+
+- `GET /api/health` – Health check
+- `GET /api/prompt?repoDir=<folder>` – Render the prompt
+- `POST /api/run` – Run modernization and return aggregated log on completion
+- `GET /api/run-stream?...` – Server-Sent Events (SSE) with real-time logs
+- `GET /api/file?directory=<dir>&folder=<name>&name=<file>` – Fetch file content
+- `GET /api/files-stream?directory=<dir>&folder=<name>&names=a,b,c` – SSE stream of artifact changes
+
+## Troubleshooting
+
+- Q CLI not found: ensure `q --version` works in your shell. The server returns an explicit error if Q is missing.
+- Logs look garbled: the UI strips ANSI sequences, but browser extensions may still inject console messages; these are harmless.
+- No artifact updates: make sure the workspace directory and folder are correct; the server waits for the folder to appear before watching it.
+
+## Scripts
+
+- `npm run web` – Start the Web UI (Express server + static frontend)
+- `npm start` – Run the CLI entry (`src/index.js`)
+
+## Workspace Layout
+
+- Default workspace root: `./workspaces`
+- Cloned repo path: `./workspaces/<folder>`
+- Artifacts produced by Q:
+  - `review.md`
+  - `plan.md`
+  - `changelog.md`
