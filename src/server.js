@@ -110,13 +110,24 @@ app.get('/api/run-stream', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
 
+  // Buffer partial lines to avoid mid-word splits
+  let lineBuffer = '';
+  const flushLines = (force = false) => {
+    const content = normalizeControl(lineBuffer);
+    const parts = content.split('\n');
+    // If not force, keep last partial segment in the buffer
+    const lastIndex = force ? parts.length : Math.max(parts.length - 1, 0);
+    for (let i = 0; i < lastIndex; i++) {
+      const line = parts[i];
+      if (line && line.length > 0) {
+        res.write(`data: ${line}\n\n`);
+      }
+    }
+    lineBuffer = force ? '' : (parts.length > 0 ? parts[parts.length - 1] : '');
+  };
   const writeData = (text) => {
-    const str = normalizeControl(String(text || ''));
-    // Send each line as a separate data field for SSE compliance
-    str.split(/\r?\n/).forEach((line) => {
-      if (line.length > 0) res.write(`data: ${line}\n`);
-    });
-    res.write('\n');
+    lineBuffer += String(text || '');
+    flushLines(false);
   };
 
   const writeEvent = (event, payload) => {
@@ -150,8 +161,11 @@ app.get('/api/run-stream', async (req, res) => {
       },
     );
 
+    // Flush any trailing content not ending with a newline
+    if (!closed) flushLines(true);
     if (!closed) writeEvent('end', { success: true, result });
   } catch (error) {
+    if (!closed) flushLines(true);
     if (!closed) writeEvent('end', { success: false, error: error.message });
   } finally {
     if (!closed) res.end();
