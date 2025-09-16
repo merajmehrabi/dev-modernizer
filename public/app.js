@@ -116,11 +116,121 @@
     }
   }
 
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function renderMarkdown(src = '') {
+    const text = String(src || '');
+    const lines = text.split(/\r?\n/);
+    let html = '';
+    let inCode = false;
+    let codeFence = null;
+    let listType = null; // 'ul' or 'ol'
+
+    const closeList = () => {
+      if (listType) { html += `</${listType}>`; listType = null; }
+    };
+
+    const inline = (s) => {
+      // Escape first
+      s = escapeHtml(s);
+      // links [text](url)
+      s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+      // bold **text**
+      s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      // italic *text*
+      s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+      // inline code `code`
+      s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+      return s;
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i];
+
+      // Fenced code blocks ```lang
+      const fenceMatch = line.match(/^```(.*)$/);
+      if (fenceMatch) {
+        if (!inCode) {
+          inCode = true;
+          codeFence = fenceMatch[1] || '';
+          closeList();
+          html += `<pre><code>`;
+        } else {
+          inCode = false;
+          codeFence = null;
+          html += `</code></pre>`;
+        }
+        continue;
+      }
+
+      if (inCode) {
+        html += `${escapeHtml(line)}\n`;
+        continue;
+      }
+
+      // Horizontal rule
+      if (/^\s*(\*\s?\*\s?\*|-\s?-\s?-|_\s?_\s?_)\s*$/.test(line)) {
+        closeList();
+        html += '<hr />';
+        continue;
+      }
+
+      // Headings
+      const h = line.match(/^(#{1,6})\s+(.+)$/);
+      if (h) {
+        closeList();
+        const level = h[1].length;
+        html += `<h${level}>${inline(h[2])}</h${level}>`;
+        continue;
+      }
+
+      // Blockquote
+      const bq = line.match(/^>\s?(.*)$/);
+      if (bq) {
+        closeList();
+        html += `<blockquote>${inline(bq[1])}</blockquote>`;
+        continue;
+      }
+
+      // Lists
+      if (/^\s*[-*]\s+/.test(line)) {
+        const item = line.replace(/^\s*[-*]\s+/, '');
+        if (listType !== 'ul') { closeList(); html += '<ul>'; listType = 'ul'; }
+        html += `<li>${inline(item)}</li>`;
+        continue;
+      }
+      if (/^\s*\d+\.\s+/.test(line)) {
+        const item = line.replace(/^\s*\d+\.\s+/, '');
+        if (listType !== 'ol') { closeList(); html += '<ol>'; listType = 'ol'; }
+        html += `<li>${inline(item)}</li>`;
+        continue;
+      }
+
+      // Paragraphs / blank lines
+      if (line.trim().length === 0) {
+        closeList();
+        html += '';
+      } else {
+        closeList();
+        html += `<p>${inline(line)}</p>`;
+      }
+    }
+
+    closeList();
+    if (inCode) { html += '</code></pre>'; }
+    return html;
+  }
+
   async function loadArtifactToInline(name) {
     try {
       const file = await fetchFile(name);
       if (artifactOutput) {
-        artifactOutput.textContent = file.content || '';
+        artifactOutput.innerHTML = renderMarkdown(file.content || '');
         artifactOutput.scrollTop = artifactOutput.scrollHeight;
       }
     } catch (e) {
@@ -457,7 +567,7 @@
             try {
               const file = await fetchFile(name);
               if (artifactOutput) {
-                artifactOutput.textContent = file.content || '';
+                artifactOutput.innerHTML = renderMarkdown(file.content || '');
                 artifactOutput.scrollTop = artifactOutput.scrollHeight;
               }
             } catch (_) {}
@@ -628,7 +738,7 @@
     const tryLoad = async () => {
       try {
         const data = await fetchFile(name);
-        docOutput.textContent = data.content || '';
+        docOutput.innerHTML = renderMarkdown(data.content || '');
         docModal.classList.add('show');
         docModal.setAttribute('aria-hidden', 'false');
         setTimeout(() => {
